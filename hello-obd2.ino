@@ -1,3 +1,24 @@
+/*
+Sent:
+68
+6a
+f1
+1
+c
+d0
+
+Recd:
+48
+6b
+10
+41
+c
+18
+f
+37
+ */
+
+
 const byte rxPin = 0;
 const byte txPin = 1;
 const byte LED_PIN = 13;
