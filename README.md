@@ -14,7 +14,7 @@ The K-Line sends and receives on the same wire.  This is a 12V interface pulled 
 
 ![](images/IMG_1607.jpg)
 
-A standard OBD2 connector is used (male).  Pins used are:
+A standard SAE J1962 OBD2 connector is used (male).  Pins used are:
 * 5 - Signal ground 
 * 7 - ISO9141 K-Line
 * 12 - +12V
@@ -27,5 +27,4 @@ Software Notes
 The ISO document that describes the physical interface is [here](https://andrewrevill.co.uk/ReferenceLibrary/OBDII%20Specifications%20-%20ISO-9141-2%20(Physical).pdf)
 
 Please see [this page](https://en.wikipedia.org/wiki/OBD-II_PIDs) for a list of the PIDs used.
-
 
