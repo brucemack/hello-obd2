@@ -199,7 +199,7 @@ void loop() {
         Serial1.write(msg, 6);
       } else if (cycle == 3) {
         // Timing advance
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x03, 0x0 };
+        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0e, 0x0 };
         msg[5] = iso_checksum(msg, 5);
         ignoreCount = 6;
         Serial1.write(msg, 6);
@@ -213,7 +213,7 @@ void loop() {
       
       // Wrap around
       cycle++;
-      if (cycle == 5) {
+      if (cycle == 4) {
         cycle = 0;
       }
       
