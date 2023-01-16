@@ -111,31 +111,35 @@ void loop() {
   else if (state == 6) {
     delay(500);
     // RPM query
-    byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0c, 0x0 };
-    msg[5] = iso_checksum(msg, 5);
+    //byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0c, 0x0 };
+    //msg[5] = iso_checksum(msg, 5);
+    // 00
+    byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x00, 0xc4 };
+    ignoreCount = 6;
     Serial1.write(msg, 6);
-    ignoreCount += 6;
     state = 7;
+    Serial.println("Sent query");
   }
 
   if (Serial1.available() > 0) {
 
     // Read a byte from the vehicle
     int r = Serial1.read();
+
+    // TEMP
+    {
+      char buf[16];
+      sprintf(buf,"%x",(int)r);
+      Serial.println(buf);
+    }
+    
     // The K-Line has transmit and receive data so check to see 
     // if we should ignore our own transmission
     if (ignoreCount > 0) {
       ignoreCount--;
+      Serial.println("(Ignored)");
     } 
     else {
-      /*
-      // TEMP
-      {
-        char buf[16];
-        sprintf(buf,"%x",(int)r);
-        Serial.println(buf);
-      }
-      */
       
       // Waiting for 0x55 after initialization
       if (state == 0) {
@@ -146,7 +150,6 @@ void loop() {
         else {
           if (r == 0x55) {
             state = 1;        
-            Serial.println("Good 0x55 ACK");
           }
           else {
             state = 99;
@@ -182,12 +185,14 @@ void loop() {
   
       // Generic display
       else if (state == 7) {
-
+        Serial.println("Accumlated");
+        /*
         // DEBUG DISPLAY
         char buf[16];
         sprintf(buf,"%x ",(int)r);
         Serial.print(buf);
-
+        */
+        /*
         // Accumulate
         rxMsg[rxMsgLen++] = (byte)r;
 
@@ -202,6 +207,7 @@ void loop() {
           // Switch batch for a new query
           state = 6;
         }
+        */
       }
     }
   }
