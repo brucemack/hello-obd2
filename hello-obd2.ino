@@ -2,9 +2,12 @@
 Very simple OBD2 scanner for ISO 9141-2 vehicles
 Bruce MacKinnon 16-Jan-2023
 
+This was tested on a 2004 Toyota Corolla 
+
 Example RPM Query
 Sent:
 68 6a f1 1 c d0
+
 Recd:
 48 6b 10 41 c 18 f 37
 */
@@ -32,11 +35,12 @@ const int MAX_RX_MSG_LEN = 256;
 byte rxMsg[MAX_RX_MSG_LEN];
 int rxMsgLen = 0;
 
+// Used for looping through multiple queries
 int cycle = 0;
 
 /**
  * Sends the ISO9141-2 compliant 5-baud initilization 
- * sequence.  This is a hex 33.
+ * sequence.  This is a hex 33 with one start bit and one stop bit.
  */
 static void generateFiveBaudInit() {
   // Let things idle long enough to time out the ECU
@@ -69,6 +73,8 @@ static byte iso_checksum(byte *data, byte len) {
     crc = crc + data[i];
   return crc;
 }
+
+// ----- PID formatting functions -------------------------------------------------
 
 // Monitor status
 static void format_01_01(const byte* m, int mLen, char* buf) {
@@ -133,7 +139,6 @@ void setup() {
 
   // Send the 5-baud init
   Serial.println("INFO: Connecting to ECU");
-  
   generateFiveBaudInit();
     
   // Set the baud rate for the ISO9141 serial port
@@ -213,7 +218,7 @@ void loop() {
       
       // Wrap around
       cycle++;
-      if (cycle == 4) {
+      if (cycle == 5) {
         cycle = 0;
       }
       
@@ -286,13 +291,6 @@ void loop() {
       // is received we process and reset the accumulator.
       else if (state == 6) {
 
-        /*
-        // DEBUG DISPLAY
-        char buf[16];
-        sprintf(buf,"%x ",(int)r);
-        Serial.print(buf);
-        */
-        
         // If we've had a significant pause since the 
         // laste byte then reset the accumulation counter
         // and assume this was a partial message fragment.
