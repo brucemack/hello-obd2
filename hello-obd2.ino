@@ -127,7 +127,7 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("OBD2 Diagnostic Scanner V1.2");
+  Serial.println("OBD2 Diagnostic Scanner V1.3");
  
   delay(2000);
 
