@@ -70,6 +70,39 @@ static byte iso_checksum(byte *data, byte len) {
   return crc;
 }
 
+// Monitor status
+static void format_01_01(const byte* m, int mLen, char* buf) {
+  unsigned int a = m[5];
+  unsigned int b = m[6];
+  sprintf(buf,"%02x %02x", a, b);
+}
+
+// Coolant temp
+static void format_01_05(const byte* m, int mLen, char* buf) {
+  int a = m[5];
+  int d = a - 50;
+  sprintf(buf,"%d degrees C", (int)d);
+}
+
+// Engine speed
+static void format_01_0c(const byte* m, int mLen, char* buf) {
+  unsigned int rpm = ((m[5] * 256) + m[6]) / 4;
+  sprintf(buf,"%d rpm",(int)rpm);
+}
+
+// Vehicle speed
+static void format_01_0d(const byte* m, int mLen, char* buf) {
+  int a = m[5];
+  sprintf(buf,"%d km/h", (int)a);
+}
+
+// Timing advance
+static void format_01_0e(const byte* m, int mLen, char* buf) {
+  int a = m[5];
+  int d = (a / 2) - 64;
+  sprintf(buf,"%d degrees", (int)d);
+}
+
 void setup() {
 
   // Console
@@ -94,12 +127,12 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("OBD2 Diagnostic Scanner");
+  Serial.println("OBD2 Diagnostic Scanner V1.2");
  
   delay(2000);
 
   // Send the 5-baud init
-  Serial.println("Connecting to ECU ...");
+  Serial.println("INFO: Connecting to ECU");
   
   generateFiveBaudInit();
     
@@ -117,7 +150,7 @@ void loop() {
 
   // Waiting for the 0x55
   if (state == 0) {
-    if ((now - lastActivityStamp) > 1000) {
+    if ((now - lastActivityStamp) > 2000) {
       Serial.println("ERROR 0: Timed out waiting for 0x55");
       state = 99;  
     }
@@ -153,22 +186,34 @@ void loop() {
         ignoreCount = 6;
         Serial1.write(msg, 6);
       } else if (cycle == 1) {
-        // Fuel pressure
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0a, 0x0 };
+        // Speed
+        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0d, 0x0 };
         msg[5] = iso_checksum(msg, 5);
         ignoreCount = 6;
         Serial1.write(msg, 6);
       } else if (cycle == 2) {
-        // Manifold pressure
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0b, 0x0 };
+        // Temp
+        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x05, 0x0 };
+        msg[5] = iso_checksum(msg, 5);
+        ignoreCount = 6;
+        Serial1.write(msg, 6);
+      } else if (cycle == 3) {
+        // Timing advance
+        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x03, 0x0 };
+        msg[5] = iso_checksum(msg, 5);
+        ignoreCount = 6;
+        Serial1.write(msg, 6);
+      } else if (cycle == 4) {
+        // Monitor status
+        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x01, 0x0 };
         msg[5] = iso_checksum(msg, 5);
         ignoreCount = 6;
         Serial1.write(msg, 6);
       }
-
+      
       // Wrap around
       cycle++;
-      if (cycle == 3) {
+      if (cycle == 5) {
         cycle = 0;
       }
       
@@ -207,6 +252,7 @@ void loop() {
         else {
           if (r == 0x55) {
             state = 1;        
+            Serial.println("INFO: Good 0x55 ACK");
           }
           else {
             state = 99;
@@ -228,7 +274,7 @@ void loop() {
       else if (state == 5) {
         // This is the inverse of 0x33
         if (r == 0xcc) {
-            Serial.println("INFO: ECU connection was successful!");
+            Serial.println("INFO: ECU connection was successful");
             state = 6;
         } else {
             Serial.println("ERROR 5: Bad 0xcc ACK");
@@ -261,30 +307,54 @@ void loop() {
 
         // Look for a complete message
         if (rxMsg[0] == 0x48 && rxMsg[1] == 0x6b) {
-          // RPM Message?
-          if (rxMsgLen == 8 && rxMsg[4] == 0x0c) {
-            unsigned int rpm = ((rxMsg[5] * 256) + rxMsg[6]) / 4;
+          // Monitor status
+          if (rxMsgLen == 8 && rxMsg[4] == 0x01) {
             char buf[64];
-            sprintf(buf,"DATA: Tach: %d rpm",(int)rpm);
+            format_01_01(rxMsg, rxMsgLen, buf);
+            Serial.print("Monitor Status: ");
             Serial.println(buf);
             // Reset the accumulator
             rxMsgLen = 0;
           }
-          // Fuel Pressure?
-          else if (rxMsgLen == 7 && rxMsg[4] == 0x0a) {
-            unsigned int p = rxMsg[5] * 3;
+          // Coolant temp
+          else if (rxMsgLen == 7 && rxMsg[4] == 0x05) {
             char buf[64];
-            sprintf(buf,"DATA: Fuel Pressure: %d kPa",(int)p);
+            format_01_05(rxMsg, rxMsgLen, buf);
+            Serial.print("Coolant Temperature: ");
             Serial.println(buf);
             // Reset the accumulator
             rxMsgLen = 0;
           }
-          // Intake Manifold Pressure?
-          else if (rxMsgLen == 7 && rxMsg[4] == 0x0b) {
-            unsigned int p = rxMsg[5];
+          // RPM Message
+          else if (rxMsgLen == 8 && rxMsg[4] == 0x0c) {
             char buf[64];
-            sprintf(buf,"DATA: Intake Manifold Pressure: %d kPa",(int)p);
+            format_01_0c(rxMsg, rxMsgLen, buf);
+            Serial.print("Tach: ");
             Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          //  Vehicle speed
+          else if (rxMsgLen == 7 && rxMsg[4] == 0x0d) {
+            char buf[64];
+            format_01_0d(rxMsg, rxMsgLen, buf);
+            Serial.print("Speed: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          //  Timing advance
+          else if (rxMsgLen == 7 && rxMsg[4] == 0x0e) {
+            char buf[64];
+            format_01_0e(rxMsg, rxMsgLen, buf);
+            Serial.print("Timing Advance: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          //  PID LIST
+          else if (rxMsgLen == 10 && rxMsg[4] == 0x00) {
+            Serial.println("DATA: LIST");
             // Reset the accumulator
             rxMsgLen = 0;
           }
