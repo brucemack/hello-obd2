@@ -70,7 +70,7 @@ void setup() {
 
     Serial.println("OBD2 Diagnostic Scanner");
    
-    delay(10000);
+    delay(2000);
 
     // Send the 5-baud init
     Serial.println("Connecting to ECU ...");
@@ -109,12 +109,13 @@ void loop() {
 
   // Waiting to send command
   else if (state == 6) {
-    delay(500);
+    // 500 didn't work
+    delay(1000);
     // RPM query
-    //byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0c, 0x0 };
-    //msg[5] = iso_checksum(msg, 5);
+    byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0c, 0x0 };
+    msg[5] = iso_checksum(msg, 5);
     // 00
-    byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x00, 0xc4 };
+    //byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x00, 0xc4 };
     ignoreCount = 6;
     Serial1.write(msg, 6);
     state = 7;
@@ -137,7 +138,7 @@ void loop() {
     // if we should ignore our own transmission
     if (ignoreCount > 0) {
       ignoreCount--;
-      Serial.println("(Ignored)");
+      //Serial.println("(Ignored)");
     } 
     else {
       
@@ -185,14 +186,12 @@ void loop() {
   
       // Generic display
       else if (state == 7) {
-        Serial.println("Accumlated");
         /*
         // DEBUG DISPLAY
         char buf[16];
         sprintf(buf,"%x ",(int)r);
         Serial.print(buf);
         */
-        /*
         // Accumulate
         rxMsg[rxMsgLen++] = (byte)r;
 
@@ -204,10 +203,9 @@ void loop() {
           sprintf(buf,"RPM %d",(int)rpm);
           Serial.println();
           Serial.println(buf);
-          // Switch batch for a new query
+          // Switch back for a new query
           state = 6;
         }
-        */
       }
     }
   }
