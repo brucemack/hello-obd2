@@ -2,6 +2,8 @@
 Very simple OBD2 scanner for ISO 9141-2 vehicles
 Bruce MacKinnon 16-Jan-2023
 
+Uses the Teensy 3.2 since we need harware serial (UART).
+
 This was tested on a 2004 Toyota Corolla 
 
 Example RPM Query
@@ -11,9 +13,13 @@ Sent:
 Recd:
 48 6b 10 41 c 18 f 37
 */
+
+// The serial TX and RX pins used to communicate with the vehicle.
 const byte rxPin = 0;
 const byte txPin = 1;
+
 const byte LED_PIN = 13;
+
 const long RX_TIMEOUT_MS = 100;
 const long W1 = 20;
 const long W4 = 30;
