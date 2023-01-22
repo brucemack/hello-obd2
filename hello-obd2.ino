@@ -191,11 +191,18 @@ void loop() {
     }
     else {
       if (cycle == 0) {
+        /*
         // RPM 
         byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0c, 0x0 };
         msg[5] = iso_checksum(msg, 5);
         ignoreCount = 6;
         Serial1.write(msg, 6);
+        */
+        // DTC trouble codes
+        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x3, 0x0 };
+        msg[4] = iso_checksum(msg, 4);
+        ignoreCount = 5;
+        Serial1.write(msg, 5);
       } else if (cycle == 1) {
         // Speed
         byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0d, 0x0 };
@@ -224,7 +231,8 @@ void loop() {
       
       // Wrap around
       cycle++;
-      if (cycle == 5) {
+      //if (cycle == 5) {
+      if (cycle == 1) {
         cycle = 0;
       }
       
@@ -296,6 +304,13 @@ void loop() {
       // Generic data accumulation state.  When a full message 
       // is received we process and reset the accumulator.
       else if (state == 6) {
+
+        // TEMP
+        {
+          char buf[16];
+          sprintf(buf,"%x",(int)r);
+          Serial.println(buf);
+        }
 
         // If we've had a significant pause since the 
         // laste byte then reset the accumulation counter
