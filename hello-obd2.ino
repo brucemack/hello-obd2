@@ -86,7 +86,9 @@ static byte iso_checksum(byte *data, byte len) {
 static void format_01_01(const byte* m, int mLen, char* buf) {
   unsigned int a = m[5];
   unsigned int b = m[6];
-  sprintf(buf,"%02x %02x", a, b);
+  unsigned int c = m[7];
+  unsigned int d = m[8];
+  sprintf(buf,"%02x %02x %02x %02x", a, b, c, d);
 }
 
 // Coolant temp
@@ -115,6 +117,13 @@ static void format_01_0e(const byte* m, int mLen, char* buf) {
   sprintf(buf,"%d degrees", (int)d);
 }
 
+// Throttle position
+static void format_01_11(const byte* m, int mLen, char* buf) {
+  int a = m[5];
+  int d = (a * 100) / 255;
+  sprintf(buf,"%d percent", (int)d);
+}
+
 void setup() {
 
   // Console
@@ -139,7 +148,7 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("OBD2 Diagnostic Scanner V1.3");
+  Serial.println("OBD2 Diagnostic Scanner V1.7");
  
   delay(2000);
 
@@ -186,23 +195,24 @@ void loop() {
   else if (state == 6) {
 
     // We only generate a command during quiet periods
-    if ((now - lastActivityStamp) < 1000) {
+    if ((now - lastActivityStamp) < 2000) {
       // PAUSE
     }
     else {
       if (cycle == 0) {
-        /*
+       
         // RPM 
         byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0c, 0x0 };
         msg[5] = iso_checksum(msg, 5);
         ignoreCount = 6;
         Serial1.write(msg, 6);
-        */
-        // DTC trouble codes
+        /* 
+        // Request DTC trouble codes
         byte msg[6] = { 0x68, 0x6a, 0xf1, 0x3, 0x0 };
         msg[4] = iso_checksum(msg, 4);
         ignoreCount = 5;
         Serial1.write(msg, 5);
+        */
       } else if (cycle == 1) {
         // Speed
         byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0d, 0x0 };
@@ -227,12 +237,18 @@ void loop() {
         msg[5] = iso_checksum(msg, 5);
         ignoreCount = 6;
         Serial1.write(msg, 6);
+      } else if (cycle == 5) {
+        // Throttle 
+        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x11, 0x0 };
+        msg[5] = iso_checksum(msg, 5);
+        ignoreCount = 6;
+        Serial1.write(msg, 6);
       }
       
       // Wrap around
       cycle++;
-      //if (cycle == 5) {
-      if (cycle == 1) {
+      if (cycle == 6) {
+      //if (cycle == 1) {
         cycle = 0;
       }
       
@@ -309,7 +325,7 @@ void loop() {
         {
           char buf[16];
           sprintf(buf,"%x",(int)r);
-          Serial.println(buf);
+          //Serial.println(buf);
         }
 
         // If we've had a significant pause since the 
@@ -327,7 +343,7 @@ void loop() {
         // Look for a complete message
         if (rxMsg[0] == 0x48 && rxMsg[1] == 0x6b) {
           // Monitor status
-          if (rxMsgLen == 8 && rxMsg[4] == 0x01) {
+          if (rxMsgLen == 10 && rxMsg[4] == 0x01) {
             char buf[64];
             format_01_01(rxMsg, rxMsgLen, buf);
             Serial.print("Monitor Status: ");
@@ -367,6 +383,15 @@ void loop() {
             char buf[64];
             format_01_0e(rxMsg, rxMsgLen, buf);
             Serial.print("Timing Advance: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          //  Throttle
+          else if (rxMsgLen == 7 && rxMsg[4] == 0x11) {
+            char buf[64];
+            format_01_11(rxMsg, rxMsgLen, buf);
+            Serial.print("Throttle: ");
             Serial.println(buf);
             // Reset the accumulator
             rxMsgLen = 0;
