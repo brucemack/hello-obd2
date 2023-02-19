@@ -14,9 +14,11 @@ Recd:
 48 6b 10 41 c 18 f 37
 */
 
-// The serial TX and RX pins used to communicate with the vehicle.
+// The serial UART TX and RX pins used to communicate with the vehicle.
 const byte rxPin = 0;
 const byte txPin = 1;
+// This is another pin that can pull the K-Line low independently of the UART
+const byte ctlPin = 2;
 
 const byte LED_PIN = 13;
 
@@ -44,31 +46,42 @@ int rxMsgLen = 0;
 // Used for looping through multiple queries
 int cycle = 0;
 
+void doReboot() {
+  SCB_AIRCR = 0x05FA0004;
+}
+
 /**
  * Sends the ISO9141-2 compliant 5-baud initilization 
  * sequence.  This is a hex 33 with one start bit and one stop bit.
+ * LSB is transmitted first. 
+ * 
+ * Total time is 5.5 seconds to force EC2 timeout and 2 seconds to send sequence.
  */
 static void generateFiveBaudInit() {
+
+  int logLow = 1;
+  int logHigh = 0;
+  
   // Let things idle long enough to time out the ECU
   delay(5500);
-  // Start bin
-  digitalWrite(txPin, LOW);
+  // Start bit
+  digitalWrite(ctlPin, logLow);
   delay(200);
   // Send 00110011
-  digitalWrite(txPin, HIGH);
+  digitalWrite(ctlPin, logHigh);
   delay(200);
   delay(200);
-  digitalWrite(txPin, LOW);
+  digitalWrite(ctlPin, logLow);
   delay(200);
   delay(200);
-  digitalWrite(txPin, HIGH);
+  digitalWrite(ctlPin, logHigh);
   delay(200);
   delay(200);
-  digitalWrite(txPin, LOW);
+  digitalWrite(ctlPin, logLow);
   delay(200);
   delay(200);
   // Stop bit (idle state)
-  digitalWrite(txPin, HIGH);
+  digitalWrite(ctlPin, logHigh);
   delay(200);
 }
 
@@ -124,16 +137,44 @@ static void format_01_11(const byte* m, int mLen, char* buf) {
   sprintf(buf,"%d percent", (int)d);
 }
 
+void configure() {
+
+  Serial.println("INFO: Connecting to ECU");
+
+  // Send the 5-baud init
+  generateFiveBaudInit();
+    
+  // Clear any junk received on the serial port during the W1 interval
+  long s0 = millis();
+  while (millis() - s0 < W1) {
+    if (Serial1.available()) {
+      int r = Serial1.read();
+    }
+  }
+        
+  state = 0;
+  stamp0 = millis();    
+  lastActivityStamp = millis();
+  ignoreCount = 0;
+}
+
+void unconfigure() {
+  Serial.println("INFO: Reset");
+}
+
 void setup() {
 
   // Console
   Serial.begin(9600);
 
   // Define pin modes for TX and RX
-  pinMode(rxPin, INPUT);
-  pinMode(txPin, OUTPUT);
+  //pinMode(rxPin, INPUT);
+  //pinMode(txPin, OUTPUT);
   // Idle state for TX
-  digitalWrite(txPin, HIGH);
+  //digitalWrite(txPin, HIGH);
+  pinMode(ctlPin, OUTPUT);
+  // Idle state for CTL is low (inverted!)
+  digitalWrite(ctlPin, LOW);
   pinMode(LED_PIN, OUTPUT);
   // Idle state for the LED pin
   digitalWrite(LED_PIN, LOW);
@@ -148,20 +189,12 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("OBD2 Diagnostic Scanner V1.7");
- 
-  delay(2000);
+  Serial.println("INFO: OBD2 Diagnostic Scanner V1.15");
 
-  // Send the 5-baud init
-  Serial.println("INFO: Connecting to ECU");
-  generateFiveBaudInit();
-    
   // Set the baud rate for the ISO9141 serial port
   Serial1.begin(10400);
-        
-  state = 0;
-  stamp0 = millis();    
-  lastActivityStamp = millis();
+
+  configure();
 }
 
 void loop() {
@@ -247,8 +280,8 @@ void loop() {
       
       // Wrap around
       cycle++;
-      if (cycle == 6) {
-      //if (cycle == 1) {
+      //if (cycle == 6) {
+      if (cycle == 2) {
         cycle = 0;
       }
       
@@ -261,15 +294,6 @@ void loop() {
 
     // Read a byte from the K-Line
     int r = Serial1.read();
-
-    /*
-    // TEMP
-    {
-      char buf[16];
-      sprintf(buf,"%x",(int)r);
-      Serial.println(buf);
-    }
-    */
     
     // The K-Line has transmit and receive data so check to see 
     // if we should ignore our own transmission.
@@ -277,28 +301,30 @@ void loop() {
       ignoreCount--;
     } 
     else {
+
+      /*
+      // TEMP
+      {
+        char buf[16];
+        sprintf(buf,"%x",(int)r);
+        Serial.println(buf);
+      }
+      */
       
       // Waiting for 0x55 after initialization
       if (state == 0) {
-        // Throw away garbage during W1
-        if (now - stamp0 < W1) {
-          // DO NOTHING IN THIS WINDOW
-        } 
+        if (r == 0x55) {
+          state = 1;        
+        }
         else {
-          if (r == 0x55) {
-            state = 1;        
-            Serial.println("INFO: Good 0x55 ACK");
-          }
-          else {
-            state = 99;
-            Serial.println("ERROR 1: Bad 0x55 ACK");
-          }
+          Serial.println("ERROR 1: Bad 0x55 ACK");
+          state = 99;
         }
       }
       // Waiting for KW0
       else if (state == 1) {
         kw0 = (byte)r;
-        state = 2;     
+        state = 2;    
       }
       // Waiting for KW1
       else if (state == 2) {
@@ -409,5 +435,16 @@ void loop() {
     // Keep track of the last time we got activity on the 
     // K-Line so that we can detect quiet times.
     lastActivityStamp = now;
+  }
+
+  // Check for data from the serial port
+  if (Serial.available()) {
+    int r = Serial.read();
+    if (r == 'r') {
+      unconfigure();
+      configure();
+    } else if (r == 'a') {
+      Serial1.write('a');
+    }
   }
 }
