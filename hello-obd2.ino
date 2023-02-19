@@ -139,7 +139,7 @@ static void format_01_11(const byte* m, int mLen, char* buf) {
 
 void configure() {
 
-  Serial.println("INFO: Connecting to ECU");
+  Serial.println("INFO: Connecting to vehicle");
 
   // Send the 5-baud init
   generateFiveBaudInit();
@@ -148,7 +148,7 @@ void configure() {
   long s0 = millis();
   while (millis() - s0 < W1) {
     if (Serial1.available()) {
-      int r = Serial1.read();
+      Serial1.read();
     }
   }
         
@@ -189,7 +189,7 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("INFO: OBD2 Diagnostic Scanner V1.15");
+  Serial.println("INFO: OBD2 Diagnostic Scanner V2.00");
 
   // Set the baud rate for the ISO9141 serial port
   Serial1.begin(10400);
@@ -233,7 +233,6 @@ void loop() {
     }
     else {
       if (cycle == 0) {
-       
         // RPM 
         byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0c, 0x0 };
         msg[5] = iso_checksum(msg, 5);
@@ -445,6 +444,9 @@ void loop() {
       configure();
     } else if (r == 'a') {
       Serial1.write('a');
+    } else if (r == 's') {
+      Serial.println("INFO: Generating delay");
+      delay(10000);
     }
   }
 }
