@@ -7,6 +7,8 @@ connector.  This supports the ISO-9141-2 K-Line interface.
 Hardware
 ========
 
+(Please see [this related project](https://github.com/brucemack/iso9141-interface) for more information about the hardware implementation.)
+
 This interface uses the Teensy 3.2.  The Teensy processor is helpful here because it supports more 
 than one hardware serial port.
 
