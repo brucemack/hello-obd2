@@ -95,6 +95,27 @@ static byte iso_checksum(byte *data, byte len) {
 
 // ----- PID formatting functions -------------------------------------------------
 
+// PIDS supported
+static void format_01_00(const byte* m, int mLen, char* buf, int basePid) {
+  int p = 0;
+  int pid = basePid;  
+  for (int i = 0; i < 4; i++) {
+    for (int k = 0; k < 8; k++) {
+      if (m[5 + i] & 0x80) {
+        char l[3];
+        sprintf(l, "%02x", pid);
+        buf[p] = l[0];
+        buf[p+1] = l[1];
+        buf[p+2] = ' ';
+        p += 3;
+      }
+      k = k << 1;
+      pid++;
+    }
+  }
+  buf[p] = 0;
+}
+
 // Monitor status
 static void format_01_01(const byte* m, int mLen, char* buf) {
   unsigned int a = m[5];
@@ -156,6 +177,8 @@ void configure() {
   stamp0 = millis();    
   lastActivityStamp = millis();
   ignoreCount = 0;
+  cycle = 0;
+  rxMsgLen = 0;
 }
 
 void unconfigure() {
@@ -189,13 +212,25 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("INFO: OBD2 Diagnostic Scanner V2.00");
+  Serial.println("INFO: OBD2 Diagnostic Scanner V2.02");
 
   // Set the baud rate for the ISO9141 serial port
   Serial1.begin(10400);
 
   configure();
 }
+
+const int introRequestCount = 6;
+
+byte introRequests[6][6] = {
+  { 0x68, 0x6a, 0xf1, 0x1, 0x01, 0x00 },
+  { 0x68, 0x6a, 0xf1, 0x1, 0x00, 0x00 },
+  { 0x68, 0x6a, 0xf1, 0x1, 0x20, 0x00 },
+  { 0x68, 0x6a, 0xf1, 0x1, 0x40, 0x00 },
+  { 0x68, 0x6a, 0xf1, 0x1, 0x60, 0x00 },  
+  { 0x68, 0x6a, 0xf1, 0x1, 0x80, 0x00 }
+};
+
 
 void loop() {
 
@@ -232,59 +267,14 @@ void loop() {
       // PAUSE
     }
     else {
-      if (cycle == 0) {
-        // RPM 
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0c, 0x0 };
-        msg[5] = iso_checksum(msg, 5);
+      // Intro messages
+      if (cycle < introRequestCount) {
+        introRequests[cycle][5] = iso_checksum(introRequests[cycle], 5);
+        Serial1.write(introRequests[cycle], 6);
         ignoreCount = 6;
-        Serial1.write(msg, 6);
-        /* 
-        // Request DTC trouble codes
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x3, 0x0 };
-        msg[4] = iso_checksum(msg, 4);
-        ignoreCount = 5;
-        Serial1.write(msg, 5);
-        */
-      } else if (cycle == 1) {
-        // Speed
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0d, 0x0 };
-        msg[5] = iso_checksum(msg, 5);
-        ignoreCount = 6;
-        Serial1.write(msg, 6);
-      } else if (cycle == 2) {
-        // Temp
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x05, 0x0 };
-        msg[5] = iso_checksum(msg, 5);
-        ignoreCount = 6;
-        Serial1.write(msg, 6);
-      } else if (cycle == 3) {
-        // Timing advance
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0e, 0x0 };
-        msg[5] = iso_checksum(msg, 5);
-        ignoreCount = 6;
-        Serial1.write(msg, 6);
-      } else if (cycle == 4) {
-        // Monitor status
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x01, 0x0 };
-        msg[5] = iso_checksum(msg, 5);
-        ignoreCount = 6;
-        Serial1.write(msg, 6);
-      } else if (cycle == 5) {
-        // Throttle 
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x11, 0x0 };
-        msg[5] = iso_checksum(msg, 5);
-        ignoreCount = 6;
-        Serial1.write(msg, 6);
+        cycle++;
+        lastActivityStamp = now;
       }
-      
-      // Wrap around
-      cycle++;
-      //if (cycle == 6) {
-      if (cycle == 2) {
-        cycle = 0;
-      }
-      
-      lastActivityStamp = now;
     }
   }
 
@@ -345,13 +335,14 @@ void loop() {
       // Generic data accumulation state.  When a full message 
       // is received we process and reset the accumulator.
       else if (state == 6) {
-
+        /*
         // TEMP
         {
           char buf[16];
-          sprintf(buf,"%x",(int)r);
-          //Serial.println(buf);
+          sprintf(buf,"%d %x",rxMsgLen, (int)r);
+          Serial.println(buf);
         }
+        */
 
         // If we've had a significant pause since the 
         // laste byte then reset the accumulation counter
@@ -367,8 +358,49 @@ void loop() {
 
         // Look for a complete message
         if (rxMsg[0] == 0x48 && rxMsg[1] == 0x6b) {
+          // Supported PIDs
+          if (rxMsgLen == 10 && rxMsg[4] == 0x00) {
+            char buf[128];
+            format_01_00(rxMsg, rxMsgLen, buf, 0x01);
+            Serial.print("Supported PIDs [01-20]: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          else if (rxMsgLen == 10 && rxMsg[4] == 0x20) {
+            char buf[128];
+            format_01_00(rxMsg, rxMsgLen, buf, 0x21);
+            Serial.print("Supported PIDs [21-40]: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          else if (rxMsgLen == 10 && rxMsg[4] == 0x40) {
+            char buf[128];
+            format_01_00(rxMsg, rxMsgLen, buf, 0x41);
+            Serial.print("Supported PIDs [41-60]: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          else if (rxMsgLen == 10 && rxMsg[4] == 0x60) {
+            char buf[128];
+            format_01_00(rxMsg, rxMsgLen, buf, 0x61);
+            Serial.print("Supported PIDs [61-80]: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          else if (rxMsgLen == 10 && rxMsg[4] == 0x80) {
+            char buf[128];
+            format_01_00(rxMsg, rxMsgLen, buf, 0x81);
+            Serial.print("Supported PIDs [81-A0]: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
           // Monitor status
-          if (rxMsgLen == 10 && rxMsg[4] == 0x01) {
+          else if (rxMsgLen == 10 && rxMsg[4] == 0x01) {
             char buf[64];
             format_01_01(rxMsg, rxMsgLen, buf);
             Serial.print("Monitor Status: ");
