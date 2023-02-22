@@ -14,9 +14,11 @@ Recd:
 48 6b 10 41 c 18 f 37
 */
 
-// The serial TX and RX pins used to communicate with the vehicle.
+// The serial UART TX and RX pins used to communicate with the vehicle.
 const byte rxPin = 0;
 const byte txPin = 1;
+// This is another pin that can pull the K-Line low independently of the UART
+const byte ctlPin = 2;
 
 const byte LED_PIN = 13;
 
@@ -44,31 +46,42 @@ int rxMsgLen = 0;
 // Used for looping through multiple queries
 int cycle = 0;
 
+void doReboot() {
+  SCB_AIRCR = 0x05FA0004;
+}
+
 /**
  * Sends the ISO9141-2 compliant 5-baud initilization 
  * sequence.  This is a hex 33 with one start bit and one stop bit.
+ * LSB is transmitted first. 
+ * 
+ * Total time is 5.5 seconds to force EC2 timeout and 2 seconds to send sequence.
  */
 static void generateFiveBaudInit() {
+
+  int logLow = 1;
+  int logHigh = 0;
+  
   // Let things idle long enough to time out the ECU
   delay(5500);
-  // Start bin
-  digitalWrite(txPin, LOW);
+  // Start bit
+  digitalWrite(ctlPin, logLow);
   delay(200);
   // Send 00110011
-  digitalWrite(txPin, HIGH);
+  digitalWrite(ctlPin, logHigh);
   delay(200);
   delay(200);
-  digitalWrite(txPin, LOW);
+  digitalWrite(ctlPin, logLow);
   delay(200);
   delay(200);
-  digitalWrite(txPin, HIGH);
+  digitalWrite(ctlPin, logHigh);
   delay(200);
   delay(200);
-  digitalWrite(txPin, LOW);
+  digitalWrite(ctlPin, logLow);
   delay(200);
   delay(200);
   // Stop bit (idle state)
-  digitalWrite(txPin, HIGH);
+  digitalWrite(ctlPin, logHigh);
   delay(200);
 }
 
@@ -81,6 +94,27 @@ static byte iso_checksum(byte *data, byte len) {
 }
 
 // ----- PID formatting functions -------------------------------------------------
+
+// PIDS supported
+static void format_01_00(const byte* m, int mLen, char* buf, int basePid) {
+  int p = 0;
+  int pid = basePid;  
+  for (int i = 0; i < 4; i++) {
+    for (int k = 0; k < 8; k++) {
+      if (m[5 + i] & 0x80) {
+        char l[3];
+        sprintf(l, "%02x", pid);
+        buf[p] = l[0];
+        buf[p+1] = l[1];
+        buf[p+2] = ' ';
+        p += 3;
+      }
+      k = k << 1;
+      pid++;
+    }
+  }
+  buf[p] = 0;
+}
 
 // Monitor status
 static void format_01_01(const byte* m, int mLen, char* buf) {
@@ -124,16 +158,46 @@ static void format_01_11(const byte* m, int mLen, char* buf) {
   sprintf(buf,"%d percent", (int)d);
 }
 
+void configure() {
+
+  Serial.println("INFO: Connecting to vehicle");
+
+  // Send the 5-baud init
+  generateFiveBaudInit();
+    
+  // Clear any junk received on the serial port during the W1 interval
+  long s0 = millis();
+  while (millis() - s0 < W1) {
+    if (Serial1.available()) {
+      Serial1.read();
+    }
+  }
+        
+  state = 0;
+  stamp0 = millis();    
+  lastActivityStamp = millis();
+  ignoreCount = 0;
+  cycle = 0;
+  rxMsgLen = 0;
+}
+
+void unconfigure() {
+  Serial.println("INFO: Reset");
+}
+
 void setup() {
 
   // Console
   Serial.begin(9600);
 
   // Define pin modes for TX and RX
-  pinMode(rxPin, INPUT);
-  pinMode(txPin, OUTPUT);
+  //pinMode(rxPin, INPUT);
+  //pinMode(txPin, OUTPUT);
   // Idle state for TX
-  digitalWrite(txPin, HIGH);
+  //digitalWrite(txPin, HIGH);
+  pinMode(ctlPin, OUTPUT);
+  // Idle state for CTL is low (inverted!)
+  digitalWrite(ctlPin, LOW);
   pinMode(LED_PIN, OUTPUT);
   // Idle state for the LED pin
   digitalWrite(LED_PIN, LOW);
@@ -148,21 +212,25 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("OBD2 Diagnostic Scanner V1.7");
- 
-  delay(2000);
+  Serial.println("INFO: OBD2 Diagnostic Scanner V2.02");
 
-  // Send the 5-baud init
-  Serial.println("INFO: Connecting to ECU");
-  generateFiveBaudInit();
-    
   // Set the baud rate for the ISO9141 serial port
   Serial1.begin(10400);
-        
-  state = 0;
-  stamp0 = millis();    
-  lastActivityStamp = millis();
+
+  configure();
 }
+
+const int introRequestCount = 6;
+
+byte introRequests[6][6] = {
+  { 0x68, 0x6a, 0xf1, 0x1, 0x01, 0x00 },
+  { 0x68, 0x6a, 0xf1, 0x1, 0x00, 0x00 },
+  { 0x68, 0x6a, 0xf1, 0x1, 0x20, 0x00 },
+  { 0x68, 0x6a, 0xf1, 0x1, 0x40, 0x00 },
+  { 0x68, 0x6a, 0xf1, 0x1, 0x60, 0x00 },  
+  { 0x68, 0x6a, 0xf1, 0x1, 0x80, 0x00 }
+};
+
 
 void loop() {
 
@@ -199,60 +267,14 @@ void loop() {
       // PAUSE
     }
     else {
-      if (cycle == 0) {
-       
-        // RPM 
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0c, 0x0 };
-        msg[5] = iso_checksum(msg, 5);
+      // Intro messages
+      if (cycle < introRequestCount) {
+        introRequests[cycle][5] = iso_checksum(introRequests[cycle], 5);
+        Serial1.write(introRequests[cycle], 6);
         ignoreCount = 6;
-        Serial1.write(msg, 6);
-        /* 
-        // Request DTC trouble codes
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x3, 0x0 };
-        msg[4] = iso_checksum(msg, 4);
-        ignoreCount = 5;
-        Serial1.write(msg, 5);
-        */
-      } else if (cycle == 1) {
-        // Speed
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0d, 0x0 };
-        msg[5] = iso_checksum(msg, 5);
-        ignoreCount = 6;
-        Serial1.write(msg, 6);
-      } else if (cycle == 2) {
-        // Temp
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x05, 0x0 };
-        msg[5] = iso_checksum(msg, 5);
-        ignoreCount = 6;
-        Serial1.write(msg, 6);
-      } else if (cycle == 3) {
-        // Timing advance
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x0e, 0x0 };
-        msg[5] = iso_checksum(msg, 5);
-        ignoreCount = 6;
-        Serial1.write(msg, 6);
-      } else if (cycle == 4) {
-        // Monitor status
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x01, 0x0 };
-        msg[5] = iso_checksum(msg, 5);
-        ignoreCount = 6;
-        Serial1.write(msg, 6);
-      } else if (cycle == 5) {
-        // Throttle 
-        byte msg[6] = { 0x68, 0x6a, 0xf1, 0x1, 0x11, 0x0 };
-        msg[5] = iso_checksum(msg, 5);
-        ignoreCount = 6;
-        Serial1.write(msg, 6);
+        cycle++;
+        lastActivityStamp = now;
       }
-      
-      // Wrap around
-      cycle++;
-      if (cycle == 6) {
-      //if (cycle == 1) {
-        cycle = 0;
-      }
-      
-      lastActivityStamp = now;
     }
   }
 
@@ -261,15 +283,6 @@ void loop() {
 
     // Read a byte from the K-Line
     int r = Serial1.read();
-
-    /*
-    // TEMP
-    {
-      char buf[16];
-      sprintf(buf,"%x",(int)r);
-      Serial.println(buf);
-    }
-    */
     
     // The K-Line has transmit and receive data so check to see 
     // if we should ignore our own transmission.
@@ -277,28 +290,30 @@ void loop() {
       ignoreCount--;
     } 
     else {
+
+      /*
+      // TEMP
+      {
+        char buf[16];
+        sprintf(buf,"%x",(int)r);
+        Serial.println(buf);
+      }
+      */
       
       // Waiting for 0x55 after initialization
       if (state == 0) {
-        // Throw away garbage during W1
-        if (now - stamp0 < W1) {
-          // DO NOTHING IN THIS WINDOW
-        } 
+        if (r == 0x55) {
+          state = 1;        
+        }
         else {
-          if (r == 0x55) {
-            state = 1;        
-            Serial.println("INFO: Good 0x55 ACK");
-          }
-          else {
-            state = 99;
-            Serial.println("ERROR 1: Bad 0x55 ACK");
-          }
+          Serial.println("ERROR 1: Bad 0x55 ACK");
+          state = 99;
         }
       }
       // Waiting for KW0
       else if (state == 1) {
         kw0 = (byte)r;
-        state = 2;     
+        state = 2;    
       }
       // Waiting for KW1
       else if (state == 2) {
@@ -320,13 +335,14 @@ void loop() {
       // Generic data accumulation state.  When a full message 
       // is received we process and reset the accumulator.
       else if (state == 6) {
-
+        /*
         // TEMP
         {
           char buf[16];
-          sprintf(buf,"%x",(int)r);
-          //Serial.println(buf);
+          sprintf(buf,"%d %x",rxMsgLen, (int)r);
+          Serial.println(buf);
         }
+        */
 
         // If we've had a significant pause since the 
         // laste byte then reset the accumulation counter
@@ -342,8 +358,49 @@ void loop() {
 
         // Look for a complete message
         if (rxMsg[0] == 0x48 && rxMsg[1] == 0x6b) {
+          // Supported PIDs
+          if (rxMsgLen == 10 && rxMsg[4] == 0x00) {
+            char buf[128];
+            format_01_00(rxMsg, rxMsgLen, buf, 0x01);
+            Serial.print("Supported PIDs [01-20]: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          else if (rxMsgLen == 10 && rxMsg[4] == 0x20) {
+            char buf[128];
+            format_01_00(rxMsg, rxMsgLen, buf, 0x21);
+            Serial.print("Supported PIDs [21-40]: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          else if (rxMsgLen == 10 && rxMsg[4] == 0x40) {
+            char buf[128];
+            format_01_00(rxMsg, rxMsgLen, buf, 0x41);
+            Serial.print("Supported PIDs [41-60]: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          else if (rxMsgLen == 10 && rxMsg[4] == 0x60) {
+            char buf[128];
+            format_01_00(rxMsg, rxMsgLen, buf, 0x61);
+            Serial.print("Supported PIDs [61-80]: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          else if (rxMsgLen == 10 && rxMsg[4] == 0x80) {
+            char buf[128];
+            format_01_00(rxMsg, rxMsgLen, buf, 0x81);
+            Serial.print("Supported PIDs [81-A0]: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
           // Monitor status
-          if (rxMsgLen == 10 && rxMsg[4] == 0x01) {
+          else if (rxMsgLen == 10 && rxMsg[4] == 0x01) {
             char buf[64];
             format_01_01(rxMsg, rxMsgLen, buf);
             Serial.print("Monitor Status: ");
@@ -409,5 +466,19 @@ void loop() {
     // Keep track of the last time we got activity on the 
     // K-Line so that we can detect quiet times.
     lastActivityStamp = now;
+  }
+
+  // Check for data from the serial port
+  if (Serial.available()) {
+    int r = Serial.read();
+    if (r == 'r') {
+      unconfigure();
+      configure();
+    } else if (r == 'a') {
+      Serial1.write('a');
+    } else if (r == 's') {
+      Serial.println("INFO: Generating delay");
+      delay(10000);
+    }
   }
 }
