@@ -8,6 +8,8 @@ This has been tested on a 2005 Toyota Corolla and a 1999 Honda Civic (D16Y7 engi
 
 This design has been used to read DTC codes out of the Civic.
 
+The [code is here](https://github.com/brucemack/hello-obd2/blob/main/hello-obd2.ino).  This is a C program developed using the Arduino platform.
+
 Standards
 =========
 
