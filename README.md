@@ -4,6 +4,8 @@ Overview
 This is a simple demonstration of communicating with a car via the OBD-II (on board diagnostic)
 connector.  This supports the ISO-9141-2 K-Line interface. 
 
+This has been tested on a 2005 Toyota Corolla and a 1999 Honda Civic (D16Y7 engine).
+
 Hardware
 ========
 
@@ -37,4 +39,33 @@ Software Notes
 The ISO document that describes the physical interface is [here](https://andrewrevill.co.uk/ReferenceLibrary/OBDII%20Specifications%20-%20ISO-9141-2%20(Physical).pdf)
 
 Please see [this page](https://en.wikipedia.org/wiki/OBD-II_PIDs) for a list of the PIDs used.
+
+Example
+=======
+
+Here's the initial output as seen on a 2005 Toyota Corolla:
+
+![](images/tc01.png)
+
+Analysis (using this: https://en.wikipedia.org/wiki/OBD-II_PIDs):
+* Status:
+    * No check-engine light (MIL)
+    * No DTCs saved
+    * Tests availble for Components, Fuel System, Misfire
+    * Tests availble for Oxygen sensor, Evaporative system, at Catalyst
+    * No tests are incomplete
+* PIDs supported
+    * 01 - Status
+    * 02 - Freeze DTC
+    * 03 - Fuel system status
+    * 04 - Engine load
+    * 09 - Long term fuel trim (2)
+    * 0A - Fuel pressure
+    * 0B - Intake manifold pressure
+    * 0C - Engine speed
+    * 21 - Distance traveled with MIL indicator
+    * 22 - Fuel rail pressure
+    * 23 - Fuel rail gauge pressure
+    * 24 - Oxygen sensor 1
+
 
