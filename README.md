@@ -2,21 +2,31 @@ Overview
 ========
 
 This is a simple demonstration of communicating with a car via the OBD-II (on board diagnostic)
-connector.  This supports the ISO-9141-2 K-Line interface. 
+connector.  This supports the ISO-9141-2 K-Line interface.  The more modern CAN bus is not supported - that's a different project.
 
 This has been tested on a 2005 Toyota Corolla and a 1999 Honda Civic (D16Y7 engine).
+
+This design has been used to read DTC codes out of the Civic.
+
+Standards
+=========
+
+* Electrical: https://cdn.standards.iteh.ai/samples/16737/e6b719fd44c345a792656f6d19e6cee4/ISO-9141-1989.pdf (note: probably an unauthorized copy)
+* Protocol: http://forum.amadeus-project.com/index.php?act=attach&type=post&id=9491 (note: probably an unauthorized copy)
+* Good detail: https://www.irjet.net/archives/V4/i7/IRJET-V4I7181.pdf
 
 Hardware
 ========
 
 (Please see [this related project](https://github.com/brucemack/iso9141-interface) for more information about the hardware implementation.)
 
-This interface uses the Teensy 3.2.  The Teensy processor is helpful here because it supports more 
-than one hardware serial port.
+This interface uses the Teensy 3.2.  The Teensy controller is helpful here because it supports more than one hardware serial port.
 
-The K-Line sends and receives on the same wire.  This is a 12V interface pulled up by a 560 ohm resistor and pulled down by a 2N3904 NPN transistor.  An extra transistor stage is used as in inverter.
+The K-Line sends and receives on the same wire.  This is a 12V interface pulled up by a 560 ohm resistor and pulled down by a 2N3904 NPN transistor.  An extra transistor stage is used as an inverter.
 
-One challenge is that the ISO-9141 uses a very slow handshake at the start of the connection: the so-called "5 Baud" interface.  Because the Teensy 3.2 (or most any controller) is not capable of generating such a slow transmission, we use "bit banging" to generate that 2 second handshake.  A separate IO pin is used for thsi purpose to avoid conflicts with the UART.  Please see the "CTL0" input in the schematic below.
+One challenge is that the ISO-9141 specification defines a slow handshake at the start of the connection: the so-called "5 Baud" interface.  Because the Teensy 3.2 (or most any controller) is not capable of generating such a slow transmission rate, we use "bit banging" to generate that 2 second handshake.  A separate I/O pin is used for this purpose to avoid conflicts with the UART.  Please see the "CTL0" input in the schematic below.
+
+Normal transmission happens at 10,400 baud (8/none) as defined in the spec.
 
 Here's the schematic, as simulated in LT-Spice:
 
