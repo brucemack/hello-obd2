@@ -32,6 +32,8 @@ long lastActivityStamp = 0;
 byte kw0 = 0;
 byte kw1 = 0;
 
+bool diag = false;
+
 // Number of received byte to ignore - used to eliminate
 // process of bytes that we send on the K-Line (i.e. echo
 // ignore).
@@ -335,14 +337,12 @@ void loop() {
       // Generic data accumulation state.  When a full message 
       // is received we process and reset the accumulator.
       else if (state == 6) {
-        /*
-        // TEMP
-        {
+
+        if (diag) {
           char buf[16];
-          sprintf(buf,"%d %x",rxMsgLen, (int)r);
-          Serial.println(buf);
+          sprintf(buf,"%x ",(int)r);
+          Serial.print(buf);
         }
-        */
 
         // If we've had a significant pause since the 
         // laste byte then reset the accumulation counter
@@ -476,6 +476,9 @@ void loop() {
       configure();
     } else if (r == 'a') {
       Serial1.write('a');
+    } else if (r == 'd') {
+      // Toggle diag
+      diag = true;
     } else if (r == 's') {
       Serial.println("INFO: Generating delay");
       delay(10000);
