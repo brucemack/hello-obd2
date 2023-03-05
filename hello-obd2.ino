@@ -1,10 +1,10 @@
 /*
 Very simple OBD2 scanner for ISO 9141-2 vehicles
-Bruce MacKinnon 16-Jan-2023
+Bruce MacKinnon 05-Mar-2023
 
 Uses the Teensy 3.2 since we need harware serial (UART).
 
-This was tested on a 2004 Toyota Corolla 
+This was tested on a 2004 Toyota Corolla and a 1999 Honda Civic.
 
 Example RPM Query
 Sent:
@@ -192,11 +192,6 @@ void setup() {
   // Console
   Serial.begin(9600);
 
-  // Define pin modes for TX and RX
-  //pinMode(rxPin, INPUT);
-  //pinMode(txPin, OUTPUT);
-  // Idle state for TX
-  //digitalWrite(txPin, HIGH);
   pinMode(ctlPin, OUTPUT);
   // Idle state for CTL is low (inverted!)
   digitalWrite(ctlPin, LOW);
@@ -214,7 +209,7 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("INFO: OBD2 Diagnostic Scanner V2.02");
+  Serial.println("INFO: OBD2 Diagnostic Scanner V2.03");
 
   // Set the baud rate for the ISO9141 serial port
   Serial1.begin(10400);
@@ -222,17 +217,18 @@ void setup() {
   configure();
 }
 
-const int introRequestCount = 6;
+const int introRequestCount = 7;
 
-byte introRequests[6][6] = {
-  { 0x68, 0x6a, 0xf1, 0x1, 0x01, 0x00 },
-  { 0x68, 0x6a, 0xf1, 0x1, 0x00, 0x00 },
-  { 0x68, 0x6a, 0xf1, 0x1, 0x20, 0x00 },
-  { 0x68, 0x6a, 0xf1, 0x1, 0x40, 0x00 },
-  { 0x68, 0x6a, 0xf1, 0x1, 0x60, 0x00 },  
-  { 0x68, 0x6a, 0xf1, 0x1, 0x80, 0x00 }
+byte introRequests[7][7] = {
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x01, 0x00 },
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x00, 0x00 },
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x20, 0x00 },
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x40, 0x00 },
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x60, 0x00 },  
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x80, 0x00 },
+  // Request DTCs
+  { 5,  0x68, 0x6a, 0xf1, 0x3, 0x00, 0x00 }
 };
-
 
 void loop() {
 
@@ -271,9 +267,13 @@ void loop() {
     else {
       // Intro messages
       if (cycle < introRequestCount) {
-        introRequests[cycle][5] = iso_checksum(introRequests[cycle], 5);
-        Serial1.write(introRequests[cycle], 6);
-        ignoreCount = 6;
+        // The intro messages have variable lengths, so use the first byte 
+        // to determine how longh the message is
+        int len = introRequests[cycle][0];
+        // WATCH OUT!  The first byte doesn't get sent
+        introRequests[cycle][len] = iso_checksum(introRequests[cycle] + 1, len - 1);
+        Serial1.write(introRequests[cycle] + 1, len);
+        ignoreCount = len;
         cycle++;
         lastActivityStamp = now;
       }
