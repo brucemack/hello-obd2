@@ -2,18 +2,20 @@ Overview
 ========
 
 This project is a simple demonstration of how to communicate with a car via the OBD-II (on board diagnostic)
-connector.  This supports the ISO-9141-2 K-Line interface.  The more modern CAN bus is not supported yet - that's a different project.
+connector.  This connector allows you to read diagnostic codes from the car's engine control unit (ECU) and to get some real-time performance data.
+
+This project supports the ISO-9141-2 K-Line interface.  The more modern CAN bus is not supported yet - that's a different project.
 
 This has been tested on a 2005 Toyota Corolla and a 1999 Honda Civic (D16Y7 engine).
 
-This design has been used to read DTC codes out of the Civic.
+The design has been used to read DTC codes out of the Civic.
 
 The [code is here](https://github.com/brucemack/hello-obd2/blob/main/hello-obd2.ino).  This is a C program developed using the Arduino platform.
 
 Hardware
 ========
 
-Here's what the development platform looks like:
+Custom hardware was build to provide physically connectivity to the car. Here's what the development platform looks like:
 
 ![](images/IMG_1673.jpg)
 
