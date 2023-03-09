@@ -17,7 +17,7 @@ To make things easier to test, a [companion ECU simulator was also constructed](
 Hardware
 ========
 
-Custom hardware was build to provide physically connectivity to the car. Here's what the development platform looks like:
+Custom hardware was built to provide physical connectivity to the car. Here's what the development platform looks like:
 
 ![](images/IMG_1673.jpg)
 
