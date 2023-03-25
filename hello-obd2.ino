@@ -160,6 +160,43 @@ static void format_01_11(const byte* m, int mLen, char* buf) {
   sprintf(buf,"%d percent", (int)d);
 }
 
+// DTC codes
+// Total length is 11.  THIS ONLY WORKS FOR THE 6-BYTE RESPONSE
+static void format_03(const byte* m, int mLen, char* buf) {
+
+  int outPtr = 0;
+  // Skip past the first 4 bytes of the response
+  int inPtr = 4;
+
+  for (int i = 0; i < 3; i++) {
+    byte a = m[inPtr];
+    byte b = m[inPtr + 1];
+    // First determine the category
+    byte a7a6 = (a & 0b11000000) >> 6;
+    char category = '?';
+    if (a7a6 == 0x00) {
+      category = 'P';
+    } 
+    else if (a7a6 == 0x01) {
+      category = 'C';
+    } 
+    else if (a7a6 == 0x02) {
+      category = 'B';
+    } 
+    else if (a7a6 == 0x03) {
+      category = 'U';      
+    } 
+    unsigned int code = a & 0b00111111;
+    code = code << 8;
+    code = code | b; 
+    if (code != 0) {
+      sprintf(buf + outPtr,"%c%04X ", category, code);
+      outPtr += 6;
+    }
+    inPtr += 2;
+  }
+}
+
 void configure() {
 
   Serial.println("INFO: Connecting to vehicle");
@@ -209,12 +246,23 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("INFO: OBD2 Diagnostic Scanner V2.03");
+  Serial.println("INFO: OBD2 Diagnostic Scanner V2.04");
 
   // Set the baud rate for the ISO9141 serial port
   Serial1.begin(10400);
 
   configure();
+}
+
+static int sendClearDTC() {
+  byte out[5];
+  out[0] = 0x68;
+  out[1] = 0x6a;   
+  out[2] = 0xf1;   
+  out[3] = 0x04;   
+  out[4] = iso_checksum(out, 4);
+  Serial1.write(out, 5);
+  return 5;
 }
 
 const int introRequestCount = 7;
@@ -359,7 +407,7 @@ void loop() {
         // Look for a complete message
         if (rxMsg[0] == 0x48 && rxMsg[1] == 0x6b) {
           // Supported PIDs
-          if (rxMsgLen == 10 && rxMsg[4] == 0x00) {
+          if (rxMsgLen == 10 && rxMsg[3] == 0x41 && rxMsg[4] == 0x00) {
             char buf[128];
             format_01_00(rxMsg, rxMsgLen, buf, 0x01);
             Serial.print("Supported PIDs [01-20]: ");
@@ -367,7 +415,7 @@ void loop() {
             // Reset the accumulator
             rxMsgLen = 0;
           }
-          else if (rxMsgLen == 10 && rxMsg[4] == 0x20) {
+          else if (rxMsgLen == 10 && rxMsg[3] == 0x41 && rxMsg[4] == 0x20) {
             char buf[128];
             format_01_00(rxMsg, rxMsgLen, buf, 0x21);
             Serial.print("Supported PIDs [21-40]: ");
@@ -375,7 +423,7 @@ void loop() {
             // Reset the accumulator
             rxMsgLen = 0;
           }
-          else if (rxMsgLen == 10 && rxMsg[4] == 0x40) {
+          else if (rxMsgLen == 10 && rxMsg[3] == 0x41 && rxMsg[4] == 0x40) {
             char buf[128];
             format_01_00(rxMsg, rxMsgLen, buf, 0x41);
             Serial.print("Supported PIDs [41-60]: ");
@@ -383,7 +431,7 @@ void loop() {
             // Reset the accumulator
             rxMsgLen = 0;
           }
-          else if (rxMsgLen == 10 && rxMsg[4] == 0x60) {
+          else if (rxMsgLen == 10 && rxMsg[3] == 0x41 && rxMsg[4] == 0x60) {
             char buf[128];
             format_01_00(rxMsg, rxMsgLen, buf, 0x61);
             Serial.print("Supported PIDs [61-80]: ");
@@ -391,7 +439,7 @@ void loop() {
             // Reset the accumulator
             rxMsgLen = 0;
           }
-          else if (rxMsgLen == 10 && rxMsg[4] == 0x80) {
+          else if (rxMsgLen == 10 && rxMsg[3] == 0x41 && rxMsg[4] == 0x80) {
             char buf[128];
             format_01_00(rxMsg, rxMsgLen, buf, 0x81);
             Serial.print("Supported PIDs [81-A0]: ");
@@ -400,7 +448,7 @@ void loop() {
             rxMsgLen = 0;
           }
           // Monitor status
-          else if (rxMsgLen == 10 && rxMsg[4] == 0x01) {
+          else if (rxMsgLen == 10 && rxMsg[3] == 0x41 && rxMsg[4] == 0x01) {
             char buf[64];
             format_01_01(rxMsg, rxMsgLen, buf);
             Serial.print("Monitor Status: ");
@@ -409,7 +457,7 @@ void loop() {
             rxMsgLen = 0;
           }
           // Coolant temp
-          else if (rxMsgLen == 7 && rxMsg[4] == 0x05) {
+          else if (rxMsgLen == 7 && rxMsg[3] == 0x41 && rxMsg[4] == 0x05) {
             char buf[64];
             format_01_05(rxMsg, rxMsgLen, buf);
             Serial.print("Coolant Temperature: ");
@@ -418,7 +466,7 @@ void loop() {
             rxMsgLen = 0;
           }
           // RPM Message
-          else if (rxMsgLen == 8 && rxMsg[4] == 0x0c) {
+          else if (rxMsgLen == 8 && rxMsg[3] == 0x41 && rxMsg[4] == 0x0c) {
             char buf[64];
             format_01_0c(rxMsg, rxMsgLen, buf);
             Serial.print("Tach: ");
@@ -427,7 +475,7 @@ void loop() {
             rxMsgLen = 0;
           }
           //  Vehicle speed
-          else if (rxMsgLen == 7 && rxMsg[4] == 0x0d) {
+          else if (rxMsgLen == 7 && rxMsg[3] == 0x41 && rxMsg[4] == 0x0d) {
             char buf[64];
             format_01_0d(rxMsg, rxMsgLen, buf);
             Serial.print("Speed: ");
@@ -436,7 +484,7 @@ void loop() {
             rxMsgLen = 0;
           }
           //  Timing advance
-          else if (rxMsgLen == 7 && rxMsg[4] == 0x0e) {
+          else if (rxMsgLen == 7 && rxMsg[3] == 0x41 && rxMsg[4] == 0x0e) {
             char buf[64];
             format_01_0e(rxMsg, rxMsgLen, buf);
             Serial.print("Timing Advance: ");
@@ -445,7 +493,7 @@ void loop() {
             rxMsgLen = 0;
           }
           //  Throttle
-          else if (rxMsgLen == 7 && rxMsg[4] == 0x11) {
+          else if (rxMsgLen == 7 && rxMsg[3] == 0x41 && rxMsg[4] == 0x11) {
             char buf[64];
             format_01_11(rxMsg, rxMsgLen, buf);
             Serial.print("Throttle: ");
@@ -454,8 +502,17 @@ void loop() {
             rxMsgLen = 0;
           }
           //  PID LIST
-          else if (rxMsgLen == 10 && rxMsg[4] == 0x00) {
+          else if (rxMsgLen == 10 && rxMsg[3] == 0x41 && rxMsg[4] == 0x00) {
             Serial.println("DATA: LIST");
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          //  DTC Codes
+          else if (rxMsgLen == 11 && rxMsg[3] == 0x43) {
+            char buf[64];
+            format_03(rxMsg, rxMsgLen, buf);
+            Serial.print("DTCs: ");
+            Serial.println(buf);
             // Reset the accumulator
             rxMsgLen = 0;
           }
@@ -482,6 +539,9 @@ void loop() {
     } else if (r == 's') {
       Serial.println("INFO: Generating delay");
       delay(10000);
+    } else if (r == 'c') {
+      Serial.println("INFO: Sending clear DTC");
+      ignoreCount += sendClearDTC();
     }
   }
 }
