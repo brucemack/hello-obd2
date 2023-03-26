@@ -26,6 +26,9 @@ const long RX_TIMEOUT_MS = 100;
 const long W1 = 20;
 const long W4 = 30;
 
+#define P4_MIN_MS 5
+#define P4_MAX_MS 20
+
 int state = 0;
 long stamp0 = 0;
 long lastActivityStamp = 0;
@@ -246,7 +249,7 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("INFO: OBD2 Diagnostic Scanner V2.04");
+  Serial.println("INFO: OBD2 Diagnostic Scanner V2.05");
 
   // Set the baud rate for the ISO9141 serial port
   Serial1.begin(10400);
@@ -277,6 +280,14 @@ byte introRequests[7][7] = {
   // Request DTCs
   { 5,  0x68, 0x6a, 0xf1, 0x3, 0x00, 0x00 }
 };
+
+// Writes a string of types with the required spaces between
+static void writeSlowly(Stream& str, const byte* buf, unsigned int len) {
+  for (unsigned int i = 0; i < len; i++) {
+    str.write(buf[i]);
+    delay(P4_MIN_MS);
+  }
+}
 
 void loop() {
 
@@ -309,7 +320,7 @@ void loop() {
   else if (state == 6) {
 
     // We only generate a command during quiet periods
-    if ((now - lastActivityStamp) < 2000) {
+    if ((now - lastActivityStamp) < 500) {
       // PAUSE
     }
     else {
@@ -320,7 +331,8 @@ void loop() {
         int len = introRequests[cycle][0];
         // WATCH OUT!  The first byte doesn't get sent
         introRequests[cycle][len] = iso_checksum(introRequests[cycle] + 1, len - 1);
-        Serial1.write(introRequests[cycle] + 1, len);
+        writeSlowly(Serial1, introRequests[cycle] + 1, len);
+        //Serial1.write(introRequests[cycle] + 1, len);
         ignoreCount = len;
         cycle++;
         lastActivityStamp = now;
