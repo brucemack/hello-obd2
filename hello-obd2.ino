@@ -50,6 +50,7 @@ int rxMsgLen = 0;
 
 // Used for looping through multiple queries
 int cycle = 0;
+bool inIntroCycle = true;
 
 void doReboot() {
   SCB_AIRCR = 0x05FA0004;
@@ -149,6 +150,14 @@ static void format_01_0d(const byte* m, int mLen, char* buf) {
   sprintf(buf,"%d km/h", (int)a);
 }
 
+// Fuel Trim
+static void format_01_06(const byte* m, int mLen, char* buf) {
+  int a = m[5];
+  // NOTE: CAN BE NEGATIVE!
+  int pct = ((100 * a) / 128) - 100;
+  sprintf(buf,"%d %%", pct);
+}
+
 // Timing advance
 static void format_01_0e(const byte* m, int mLen, char* buf) {
   int a = m[5];
@@ -170,6 +179,9 @@ static void format_03(const byte* m, int mLen, char* buf) {
   int outPtr = 0;
   // Skip past the first 4 bytes of the response
   int inPtr = 4;
+
+  // In case there are no codes
+  buf[0] = 0;
 
   for (int i = 0; i < 3; i++) {
     byte a = m[inPtr];
@@ -221,10 +233,11 @@ void configure() {
   ignoreCount = 0;
   cycle = 0;
   rxMsgLen = 0;
+  inIntroCycle = true;
 }
 
 void unconfigure() {
-  Serial.println("INFO: Reset");
+  Serial.println("INFO: Reset");  
 }
 
 void setup() {
@@ -249,7 +262,7 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("INFO: OBD2 Diagnostic Scanner V2.05");
+  Serial.println("INFO: OBD2 Diagnostic Scanner V2.06");
 
   // Set the baud rate for the ISO9141 serial port
   Serial1.begin(10400);
@@ -281,6 +294,17 @@ byte introRequests[7][7] = {
   // Request DTCs
   { 5,  0x68, 0x6a, 0xf1, 0x3, 0x00, 0x00 }
 };
+
+const int runRequestCount = 5;
+
+byte runRequests[5][7] = {
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x0c, 0x00 },
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x06, 0x00 },
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x07, 0x00 },
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x08, 0x00 },
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x09, 0x00 }
+};
+
 
 // Writes a string of types with the required spaces between
 static void writeSlowly(Stream& str, const byte* buf, unsigned int len) {
@@ -325,18 +349,35 @@ void loop() {
       // PAUSE
     }
     else {
-      // Intro messages
-      if (cycle < introRequestCount) {
-        // The intro messages have variable lengths, so use the first byte 
-        // to determine how longh the message is
-        int len = introRequests[cycle][0];
-        // WATCH OUT!  The first byte doesn't get sent
-        introRequests[cycle][len] = iso_checksum(introRequests[cycle] + 1, len - 1);
-        writeSlowly(Serial1, introRequests[cycle] + 1, len);
-        //Serial1.write(introRequests[cycle] + 1, len);
-        ignoreCount = len;
-        cycle++;
-        lastActivityStamp = now;
+      if (inIntroCycle) {
+        // Intro messages
+        if (cycle < introRequestCount) {
+          // The intro messages have variable lengths, so use the first byte 
+          // to determine how longh the message is
+          int len = introRequests[cycle][0];
+          // WATCH OUT!  The first byte doesn't get sent
+          introRequests[cycle][len] = iso_checksum(introRequests[cycle] + 1, len - 1);
+          writeSlowly(Serial1, introRequests[cycle] + 1, len);
+          ignoreCount = len;
+          cycle++;
+          lastActivityStamp = now;
+        } else {
+          inIntroCycle = false;
+          cycle = 0;
+          Serial.println("INFO: Entering run mode");
+        }
+      } else {
+          int len = runRequests[cycle][0];
+          // WATCH OUT!  The first byte doesn't get sent
+          runRequests[cycle][len] = iso_checksum(runRequests[cycle] + 1, len - 1);
+          writeSlowly(Serial1, runRequests[cycle] + 1, len);
+          ignoreCount = len;
+          cycle++;
+          // Wrap
+          if (cycle == runRequestCount) {
+            cycle = 0;
+          }
+          lastActivityStamp = now;
       }
     }
   }
@@ -510,6 +551,42 @@ void loop() {
             char buf[64];
             format_01_11(rxMsg, rxMsgLen, buf);
             Serial.print("Throttle: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          //  Short Term FT 1
+          else if (rxMsgLen == 7 && rxMsg[3] == 0x41 && rxMsg[4] == 0x06) {
+            char buf[64];
+            format_01_06(rxMsg, rxMsgLen, buf);
+            Serial.print("ST FT 1: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          //  Long Term FT 1
+          else if (rxMsgLen == 7 && rxMsg[3] == 0x41 && rxMsg[4] == 0x07) {
+            char buf[64];
+            format_01_06(rxMsg, rxMsgLen, buf);
+            Serial.print("LT FT 1: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          //  Short Term FT 2
+          else if (rxMsgLen == 7 && rxMsg[3] == 0x41 && rxMsg[4] == 0x08) {
+            char buf[64];
+            format_01_06(rxMsg, rxMsgLen, buf);
+            Serial.print("ST FT 2: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          //  Long Term FT 2
+          else if (rxMsgLen == 7 && rxMsg[3] == 0x41 && rxMsg[4] == 0x09) {
+            char buf[64];
+            format_01_06(rxMsg, rxMsgLen, buf);
+            Serial.print("LT FT 2: ");
             Serial.println(buf);
             // Reset the accumulator
             rxMsgLen = 0;
