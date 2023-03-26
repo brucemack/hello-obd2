@@ -264,7 +264,8 @@ static int sendClearDTC() {
   out[2] = 0xf1;   
   out[3] = 0x04;   
   out[4] = iso_checksum(out, 4);
-  Serial1.write(out, 5);
+  writeSlowly(Serial1, out, 5);
+  //Serial1.write(out, 5);
   return 5;
 }
 
