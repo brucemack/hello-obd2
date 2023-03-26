@@ -158,6 +158,13 @@ static void format_01_06(const byte* m, int mLen, char* buf) {
   sprintf(buf,"%d %%", pct);
 }
 
+// O2 sensor
+static void format_01_14(const byte* m, int mLen, char* buf) {
+  int a = m[5];
+  float v = (float)a / 200.0;
+  sprintf(buf,"%0.2f V", v);
+}
+
 // Timing advance
 static void format_01_0e(const byte* m, int mLen, char* buf) {
   int a = m[5];
@@ -262,7 +269,7 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("INFO: OBD2 Diagnostic Scanner V2.07");
+  Serial.println("INFO: OBD2 Diagnostic Scanner V2.08");
 
   // Set the baud rate for the ISO9141 serial port
   Serial1.begin(10400);
@@ -295,17 +302,18 @@ byte introRequests[7][7] = {
   { 5,  0x68, 0x6a, 0xf1, 0x3, 0x00, 0x00 }
 };
 
-const int runRequestCount = 6;
+static const int runRequestCount = 8;
 
-byte runRequests[6][7] = {
+static byte runRequests[8][7] = {
   { 6,  0x68, 0x6a, 0xf1, 0x1, 0x0c, 0x00 },
   { 6,  0x68, 0x6a, 0xf1, 0x1, 0x06, 0x00 },
   { 6,  0x68, 0x6a, 0xf1, 0x1, 0x07, 0x00 },
   { 6,  0x68, 0x6a, 0xf1, 0x1, 0x08, 0x00 },
   { 6,  0x68, 0x6a, 0xf1, 0x1, 0x09, 0x00 },
-  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x11, 0x00 }
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x11, 0x00 },
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x14, 0x00 },
+  { 6,  0x68, 0x6a, 0xf1, 0x1, 0x15, 0x00 }
 };
-
 
 // Writes a string of types with the required spaces between
 static void writeSlowly(Stream& str, const byte* buf, unsigned int len) {
@@ -588,6 +596,24 @@ void loop() {
             char buf[64];
             format_01_06(rxMsg, rxMsgLen, buf);
             Serial.print("LT FT 2: ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          //  O2 sensor bank 1/sensor 1
+          else if (rxMsgLen == 8 && rxMsg[3] == 0x41 && rxMsg[4] == 0x14) {
+            char buf[64];
+            format_01_14(rxMsg, rxMsgLen, buf);
+            Serial.print("O2 Sensor (1/1): ");
+            Serial.println(buf);
+            // Reset the accumulator
+            rxMsgLen = 0;
+          }
+          //  O2 sensor bank 1/sensor 2
+          else if (rxMsgLen == 8 && rxMsg[3] == 0x41 && rxMsg[4] == 0x15) {
+            char buf[64];
+            format_01_14(rxMsg, rxMsgLen, buf);
+            Serial.print("O2 Sensor (1/2): ");
             Serial.println(buf);
             // Reset the accumulator
             rxMsgLen = 0;
