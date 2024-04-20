@@ -1,6 +1,12 @@
 /*
 Very simple OBD2 scanner for ISO 9141-2 vehicles
-Bruce MacKinnon 05-Mar-2023
+Copyright (C) 2024 - Bruce MacKinnon
+
+This work is covered under the terms of the GNU Public License (V3). Please consult the LICENSE file for 
+more information.
+
+This work is being made available for non-commercial use. Redistribution, commercial use or sale of any 
+part is prohibited.
 
 Tested on an Arduino Nano o 20-Apr-2024
 Will work on a Teensy 3.2 since it has a second harware serial (UART).
