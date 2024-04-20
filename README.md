@@ -53,6 +53,41 @@ The ISO document that describes the physical interface is [here](https://andrewr
 
 Please see [this page](https://en.wikipedia.org/wiki/OBD-II_PIDs) for a list of the PIDs used.
 
+Notes on Integration with an Arduino Nano
+=========================================
+
+It would be helpful to demonstrate support for the Arduino Nano, given how ubiquitous this part is. There are two 
+challenges that need to be studied:
+* The Nano only has a single hardware UART which is connected to the USB connector on the board. We want to leave that 
+available for user interaction (console) so it can't be used for communicating with a vehicle. An alternate UART is needed.
+* There are Arduino libraries that support "software serial" capability on arbitrary pins.  However, the mainstream library
+distributed by Arduino doesn't support simultaneous bidirectional communications. Note that we don't necessarily need 
+bidirectional communications since the K-Line is a *one wire protocol*, but the original code was developed using 
+hardware UARTs that supports bidirectional and it will be a lot easier if all implementations work this way.
+
+Paul Stoffrogen (of Teensy fame) has created [this library](https://www.pjrc.com/teensy/td_libs_AltSoftSerial.html) that supports 
+bi-directional software serial ports. In my experience, Paul knows what he is doing! 
+
+The latest version (2.09) has been tested using this configuration and it worked on the first try.
+
+The Nano used for this test was not an authentic Arduino board. I used an ELEGOO Nano clone which contained a CH340 USB interface
+which is a cheap substitute for the FT232. The only tricky thing with these clone Nano boards can be getting the right USB 
+driver for the CH340 chip.
+
+Demo Pictures (Nano) 
+====================
+
+Here's the complete setup, attached to my [ECU Simulator](https://github.com/brucemack/ecu-sim).
+
+![Nano Demonstration Setup](images/IMG_0832.jpeg)
+
+Here's what the console outout looks like. On connection, the demo asks the vehicle 
+for the list of supported PIDs, any current diagnostic trouble codes (DTCs), and then polls for the engine RPM every 15 seconds.
+
+![Nano Demonstration Console](images/IMG_0831.jpeg)
+
+The ECU simulation reports two trouble codes: P0122 (throttle position sensor) and P1509 (IACV sensor failure).
+
 Standards
 =========
 
