@@ -2,7 +2,8 @@
 Very simple OBD2 scanner for ISO 9141-2 vehicles
 Bruce MacKinnon 05-Mar-2023
 
-Uses the Teensy 3.2 since we need harware serial (UART).
+Tested on an Arduino Nano o 20-Apr-2024
+Will work on a Teensy 3.2 since it has a second harware serial (UART).
 
 This was tested on a 2004 Toyota Corolla and a 1999 Honda Civic.
 
@@ -14,9 +15,20 @@ Recd:
 48 6b 10 41 c 18 f 37
 */
 
+// Paul Stoffrogen's software serial is used on the Arduino Nano 
+// or any other board that lacks a second hardware UART.
+#include <AltSoftSerial.h>
+AltSoftSerial Serial1;
+
 // The serial UART TX and RX pins used to communicate with the vehicle.
-const byte rxPin = 0;
-const byte txPin = 1;
+//const byte rxPin = 0;
+//const byte txPin = 1;
+
+// AltSoftSerial uses these pins for RX/TX
+// NOTE: There is no flexibility on these two pins
+const byte rxPin = 8;
+const byte txPin = 9;
+
 // This is another pin that can pull the K-Line low independently of the UART
 const byte ctlPin = 2;
 
@@ -53,7 +65,9 @@ int cycle = 0;
 bool inIntroCycle = true;
 
 void doReboot() {
+#ifdef TEENSY  
   SCB_AIRCR = 0x05FA0004;
+#endif
 }
 
 /**
@@ -269,7 +283,7 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
-  Serial.println("INFO: OBD2 Diagnostic Scanner V2.08");
+  Serial.println("INFO: OBD2 Diagnostic Scanner V2.09");
 
   // Set the baud rate for the ISO9141 serial port
   Serial1.begin(10400);
