@@ -131,4 +131,11 @@ Analysis (using this: https://en.wikipedia.org/wiki/OBD-II_PIDs):
     * 23 - Fuel rail gauge pressure
     * 24 - Oxygen sensor 1
 
+Copyright
+=========
 
+Copyright (C) 2024 - Bruce MacKinnon KC1FSZ
+
+This work is covered under the terms of the GNU Public License (V3). Please consult the LICENSE file for more information.
+
+This work is being made available for non-commercial use by the amateur radio community. Redistribution, commercial use or sale of any part is prohibited.
