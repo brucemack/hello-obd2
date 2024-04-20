@@ -74,10 +74,16 @@ The Nano used for this test was not an authentic Arduino board. I used an ELEGOO
 which is a cheap substitute for the FT232. The only tricky thing with these clone Nano boards can be getting the right USB 
 driver for the CH340 chip.
 
+Hookup notes:
+* Pin D9 on the Nano goes to pin 2 (yellow)  on the ISO-9141 board
+* Pin D8 on the Nano goes to pin 1 (green) on the ISO-9141 board
+* Pin D2 on the Nano goes to pin 3 (white) on the ISO-9141 board
+* Pin GND on the Nano goes to pin 5 (black) on the  ISO-9141 board
+
 Demo Pictures (Nano) 
 ====================
 
-Here's the complete setup, attached to my [ECU Simulator](https://github.com/brucemack/ecu-sim).
+Here's the complete setup, attached to my [ECU Simulator](https://github.com/brucemack/ecu-sim):
 
 ![Nano Demonstration Setup](images/IMG_0832.jpeg)
 
