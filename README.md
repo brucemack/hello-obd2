@@ -80,6 +80,8 @@ Hookup notes:
 * Pin D2 on the Nano goes to pin 3 (white) on the ISO-9141 board
 * Pin GND on the Nano goes to pin 5 (black) on the  ISO-9141 board
 
+Set your serial console to 9600 baud.
+
 Demo Pictures (Nano) 
 ====================
 
