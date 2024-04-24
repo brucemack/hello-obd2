@@ -80,13 +80,14 @@ which is a cheap substitute for the FT232. The only tricky thing with these clon
 driver for the CH340 chip.
 
 Hookup notes:
-* Pin D9 on the Nano goes to pin 1 (RX, green) on the ISO-9141 board. 
-* Pin D8 on the Nano goes to pin 2 (TX, yellow)  on the ISO-9141 board
+* Pin D9 on the Nano goes to pin 1 (TX, green) on the ISO-9141 board. 
+* Pin D8 on the Nano goes to pin 2 (RX, yellow)  on the ISO-9141 board
 * Pin D2 on the Nano goes to pin 3 (CTL, white) on the ISO-9141 board
-* Pin 5V on the Nano goes to pin 4 (5V, red) on the ISO-9141 board.  *WARNING: Don't make this connection
+* Pin D10 on the Nano goes to pin 4 (LED, white) on the ISO-9141 board
+* Pin 5V on the Nano goes to pin 5 (5V, red) on the ISO-9141 board.  *WARNING: Don't make this connection
 if you are already powering the Nano over the USB connection.  We don't want to have 
 two 5V supplies connected at the same time.  This can result in damage to the USB host.*
-* Pin GND on the Nano goes to pin 5 (GND, black) on the  ISO-9141 board
+* Pin GND on the Nano goes to pin 6 (GND, black) on the  ISO-9141 board
 
 Set your serial console to 9600 baud.
 
