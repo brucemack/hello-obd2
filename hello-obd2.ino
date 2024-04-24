@@ -1,12 +1,6 @@
 /*
 Very simple OBD2 scanner for ISO 9141-2 vehicles
-Copyright (C) 2024 - Bruce MacKinnon
-
-This work is covered under the terms of the GNU Public License (V3). Please consult the LICENSE file for 
-more information.
-
-This work is being made available for non-commercial use. Redistribution, commercial use or sale of any 
-part is prohibited.
+Bruce MacKinnon 05-Mar-2023
 
 Tested on an Arduino Nano o 20-Apr-2024
 Will work on a Teensy 3.2 since it has a second harware serial (UART).
@@ -37,7 +31,9 @@ const byte txPin = 9;
 
 // This is another pin that can pull the K-Line low independently of the UART
 const byte ctlPin = 2;
-
+// This is the indicator LED on the K-Line interface board
+const byte indPin = 10;
+// Arduino on-board LED
 const byte LED_PIN = 13;
 
 const long RX_TIMEOUT_MS = 100;
@@ -274,7 +270,9 @@ void setup() {
 
   pinMode(ctlPin, OUTPUT);
   // Idle state for CTL is low (inverted!)
-  digitalWrite(ctlPin, LOW);
+  digitalWrite(ctlPin, LOW); 
+  pinMode(indPin, OUTPUT);
+  digitalWrite(indPin, LOW);
   pinMode(LED_PIN, OUTPUT);
   // Idle state for the LED pin
   digitalWrite(LED_PIN, LOW);
@@ -681,4 +679,11 @@ void loop() {
       ignoreCount += sendClearDTC();
     }
   }
+
+  // Inidicator LED flashes when we are connected
+  if (state == 6) {
+    digitalWrite(indPin, HIGH);
+  } else {
+    digitalWrite(indPin, LOW);    
+  } 
 }
