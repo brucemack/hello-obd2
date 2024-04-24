@@ -24,6 +24,7 @@ Custom hardware was built to provide physical connectivity to the car. Here's wh
 The purple PCB was designed and manufactured specifically for this application.  Please see [this related project](https://github.com/brucemack/iso9141-interface) for more information about the hardware implementation.
 
 This interface uses the Teensy 3.2 microcontroller.  The Teensy controller is helpful here because it supports more than one hardware serial port.
+A test has also been done using an Arduino Nano (clone) using a software serial port.  See notes below.
 
 The K-Line interface is challenging because it sends and receives on the same wire.  This is a 12V interface pulled up by a 560 ohm resistor and pulled down by a 2N3904 NPN transistor.  An extra transistor stage is used as an inverter.  Special arrangements need to be made in software to ignore the "echo" of the transmitted data on the single wire.
 
@@ -35,16 +36,20 @@ Here's the schematic, as simulated in LT-Spice:
 
 ![](images/SC1.png)
 
-Here's the initial protoctype:
+Here's the initial prototype:
 
 ![](images/IMG_1607.jpg)
 
 A standard SAE J1962 OBD2 connector is used (male).  Pins used are:
+
 * 5 - Signal ground 
-* 7 - ISO9141 K-Line
+* 7 - ISO-9141 K-Line
 * 12 - +12V
 
 ![](images/IMG_1609.jpg)
+
+The interface board also has red +12V power LED, a green indicator LED (means that the ECU is connected), 
+and a +5V regulator to power a microcontroller from the vehicle's power supply.
 
 Software Notes
 ==============
@@ -75,10 +80,13 @@ which is a cheap substitute for the FT232. The only tricky thing with these clon
 driver for the CH340 chip.
 
 Hookup notes:
-* Pin D9 on the Nano goes to pin 2 (yellow)  on the ISO-9141 board
-* Pin D8 on the Nano goes to pin 1 (green) on the ISO-9141 board
-* Pin D2 on the Nano goes to pin 3 (white) on the ISO-9141 board
-* Pin GND on the Nano goes to pin 5 (black) on the  ISO-9141 board
+* Pin D9 on the Nano goes to pin 1 (RX, green) on the ISO-9141 board. 
+* Pin D8 on the Nano goes to pin 2 (TX, yellow)  on the ISO-9141 board
+* Pin D2 on the Nano goes to pin 3 (CTL, white) on the ISO-9141 board
+* Pin 5V on the Nano goes to pin 4 (5V, red) on the ISO-9141 board.  *WARNING: Don't make this connection
+if you are already powering the Nano over the USB connection.  We don't want to have 
+two 5V supplies connected at the same time.  This can result in damage to the USB host.*
+* Pin GND on the Nano goes to pin 5 (GND, black) on the  ISO-9141 board
 
 Set your serial console to 9600 baud.
 
@@ -89,7 +97,7 @@ Here's the complete setup, attached to my [ECU Simulator](https://github.com/bru
 
 ![Nano Demonstration Setup](images/IMG_0832.jpeg)
 
-Here's what the console outout looks like. On connection, the demo asks the vehicle 
+Here's what the console output looks like. On connection, the demo asks the vehicle 
 for the list of supported PIDs, any current diagnostic trouble codes (DTCs), and then polls for the engine RPM every 15 seconds.
 
 ![Nano Demonstration Console](images/IMG_0831.jpeg)
@@ -114,8 +122,8 @@ Analysis (using this: https://en.wikipedia.org/wiki/OBD-II_PIDs):
 * Status:
     * No check-engine light (MIL)
     * No DTCs saved
-    * Tests availble for Components, Fuel System, Misfire
-    * Tests availble for Oxygen sensor, Evaporative system, at Catalyst
+    * Tests available for Components, Fuel System, Misfire
+    * Tests available for Oxygen sensor, Evaporative system, at Catalyst
     * No tests are incomplete
 * PIDs supported
     * 01 - Status
